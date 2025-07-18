@@ -21,7 +21,7 @@ pinocchio_pubkey::declare_id!("FHUW81Au2k38MLkgsZ7af8FZDiDa1s8t2Hzn6bKstrpC");
 entrypoint!(process_instruction);
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub enum Instruction {
+pub enum TokenInstruction {
     InitializeTokenAccount { token_program_type: TokenProgramType },
     InitializeMintAccount { token_program_type: TokenProgramType, decimals: u8 },
     TransferTokens { token_program_type: TokenProgramType, amount: u64 },
@@ -34,10 +34,11 @@ pub fn process_instruction(
     instruction_data: &[u8]
 ) -> ProgramResult {
 
-    let instruction = Instruction::try_from_slice(instruction_data).unwrap();
+    let instruction = TokenInstruction::try_from_slice(instruction_data)
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
 
     match instruction {
-        Instruction::InitializeTokenAccount {token_program_type} => {
+        TokenInstruction::InitializeTokenAccount {token_program_type} => {
             if accounts.len() < 7 {
                 return Err(ProgramError::NotEnoughAccountKeys);
             }
@@ -52,7 +53,7 @@ pub fn process_instruction(
                 &accounts[5],
             )?;
         },
-        Instruction::InitializeMintAccount { token_program_type, decimals } => {
+        TokenInstruction::InitializeMintAccount { token_program_type, decimals } => {
             if accounts.len() < 5 {
                 return Err(ProgramError::NotEnoughAccountKeys);
             };
@@ -67,7 +68,7 @@ pub fn process_instruction(
                 decimals
             )?;
         },
-        Instruction::TransferTokens { token_program_type, amount } => {
+        TokenInstruction::TransferTokens { token_program_type, amount } => {
             if accounts.len() < 3 {
                 return Err(ProgramError::NotEnoughAccountKeys);
             };
