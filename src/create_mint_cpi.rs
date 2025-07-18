@@ -47,7 +47,7 @@ pub fn create_mint_account_cpi(
 
     program::invoke(
         &create_instruction,
-        &[&payer.clone(), &mint_account.clone(), &system_program.clone()],
+        &[&payer, &mint_account, &system_program],
     )?;
 
     // STEP 2: Initialize mint account via Token Program
@@ -70,7 +70,7 @@ pub fn create_mint_account_cpi(
 
     program::invoke(
         &initialize_instruction,
-        &[&mint_account.clone(), &rent_sysvar.clone(), &mint_authority.clone()],
+        &[&mint_account, &rent_sysvar, &mint_authority],
     )?;
 
     Ok(())

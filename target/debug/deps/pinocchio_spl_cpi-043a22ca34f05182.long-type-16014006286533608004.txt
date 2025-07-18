@@ -1,0 +1,1 @@
+fn(&[u8; pinocchio::::pubkey::Pubkey::{constant#0}], bool, bool) -> pinocchio::instruction::AccountMeta<'_> {pinocchio::instruction::AccountMeta::<'_>::new}

@@ -32,8 +32,6 @@ pub fn transfer_tokens_cpi(
             let rent = Rent::from_account_info(rent_sysvar)?;
             let lamports = rent.minimum_balance(space as usize);
 
-            let create_account_data = create_account_instruction_data(lamports, space, &token_program_id.to_bytes());
-
             let mut transfer_data = vec![3u8]; // 3 = Transfer instruction discriminator
             transfer_data.extend_from_slice(&amount.to_le_bytes());
 
@@ -46,17 +44,17 @@ pub fn transfer_tokens_cpi(
             let transfer_instruction = Instruction {
                 program_id: &TOKEN_PROGRAM_ID,
                 accounts: &transfer_token_meta,
-                data: &create_account_data,
+                data: &transfer_data,
             };
 
             program::invoke(
                 &transfer_instruction,
-                &[&from_token_account.clone(), &to_token_account.clone(), &authority.clone()],
+                &[&from_token_account, &to_token_account, &authority],
             )?;
         }
 
         TokenProgramType::Token2022 => {
-            
+
             let token_program_id = Pubkey::new_from_array(TOKEN2022_PROGRAM_ID);
 
             #[cfg(feature = "spl-token-2022")]
@@ -97,7 +95,7 @@ pub fn transfer_tokens_cpi(
 
                 program::invoke(
                     &transfer_instruction,
-                    &[&from_token_account.clone(), &to_token_account.clone(), &authority.clone()],
+                    &[&from_token_account, &to_token_account, &authority],
                 )?;
             }
         }

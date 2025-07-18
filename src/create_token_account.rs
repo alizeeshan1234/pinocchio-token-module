@@ -1,3 +1,4 @@
+// use mollusk_svm::sysvar;
 use pinocchio::{
     account_info::AccountInfo, instruction::{AccountMeta, Instruction}, program, sysvars::rent::Rent, ProgramResult, program_error::ProgramError
 };
@@ -23,7 +24,7 @@ pub use crate::helper::create_account_instruction_data;
 
 pub use crate::token_type::TokenProgramType;
 
-use solana_program::pubkey::Pubkey;
+use solana_program::{pubkey::Pubkey, sysvar::rent};
 
 /*
 Need to be implemented:
@@ -61,7 +62,7 @@ pub fn create_token_account_cpi(
     }
 
     let space = 165u64;
-    let rent = Rent::from_account_info(rent_sysvar)?;
+    let rent = Rent::from_account_info(rent_sysvar).unwrap();
     let lamports = rent.minimum_balance(space as usize);
 
     // STEP 1: CPI to System Program to create generic account
@@ -81,20 +82,21 @@ pub fn create_token_account_cpi(
 
     program::invoke(
         &create_instruction, 
-        &[
-            &payer.clone(), 
-            &token_account.clone(), 
-            &system_program.clone()
-        ]
+        &[&payer, &token_account, &system_program]
     )?;
+
+    pinocchio::pubkey::log(b"Reached Here!______________dummy");
 
     // STEP 2: CPI to Token Program to initialize as token account
 
+    let token_program_selected = &selected_token_program_id.to_bytes();
     let initialize_token_account_meta = [
         AccountMeta::writable(token_account.key()),
         AccountMeta::readonly(mint.key()),
         AccountMeta::readonly(owner.key()),
         AccountMeta::readonly(rent_sysvar.key()),
+        AccountMeta::readonly(token_program_selected),
+        AccountMeta::readonly(system_program.key()),
     ];
 
     let initialize_data = vec![1u8]; // InitializeAccount instruction discriminator (the instruction to be called)
@@ -107,46 +109,112 @@ pub fn create_token_account_cpi(
 
     program::invoke(
         &initialize_instruction,
-        &[&token_account, &mint, &owner, &rent_sysvar,]
+        &[&token_account, &mint, &owner, &rent_sysvar, &system_program]
     )?;
 
     Ok(())
 }
 
+#[cfg(test)]
+pub mod testing {
+    use super::*;
+
+    use {
+        borsh::BorshSerialize,
+        mollusk_svm::Mollusk,
+        solana_sdk::{
+            instruction::{AccountMeta, Instruction},
+            signature::Keypair,
+            signer::Signer,
+        },
+    };
+
+    use crate::{TokenInstruction, TokenProgramType};
+
+    use solana_sdk::{pubkey, pubkey::Pubkey, account::Account};
+
+    const ID: Pubkey = pubkey!("FHUW81Au2k38MLkgsZ7af8FZDiDa1s8t2Hzn6bKstrpC");
+
+    #[test]
+    pub fn test_create_token_account_cpi_token2022() {
+        let program_id = ID;
+
+        let token_account = Keypair::new();
+        let mint = Keypair::new();
+        let owner = Keypair::new();
+        let payer = Keypair::new();
+        let system_program = Pubkey::new_from_array(SYSTEM_PROGRAM_ID);
+        let rent_sysvar = solana_program::sysvar::rent::id();
+
+        let token2022_program = Pubkey::new_from_array(TOKEN2022_PROGRAM_ID);
+
+        let instruction_data = TokenInstruction::InitializeTokenAccount { 
+            token_program_type: TokenProgramType::Token2022
+        }.try_to_vec().unwrap();
+
+        let instruction = Instruction {
+            program_id: program_id.into(),
+            data: instruction_data,
+            accounts: vec![
+                AccountMeta::new(token_account.pubkey(), true),
+                AccountMeta::new(mint.pubkey(), false),
+                AccountMeta::new(owner.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(system_program, false),
+                AccountMeta::new(rent_sysvar, false),
+            ],
+        };
+
+        let accounts = vec![
+            (token2022_program, Account::default()),
+            (token_account.pubkey(), Account::default()),
+            (mint.pubkey(), Account::default()),
+            (owner.pubkey(), Account::default()),
+            (payer.pubkey(), Account::default()),
+            (system_program, Account::default()),
+            (rent_sysvar, Account::default()),
+        ];
+
+        let mollusk = Mollusk::new(&program_id.into(), "target/deploy/pinocchio_spl_cpi");
+
+        let result = mollusk.process_instruction(&instruction, &accounts);
+
+        assert!(result.raw_result.is_ok(), "Instruction failed: {:?}", result.raw_result);
+
+    }
+}
 
 // #[cfg(test)]
-// mod testing {
+// mod tests {
+//     use mollusk_svm::Mollusk;
+//     use solana_sdk::{pubkey, pubkey::Pubkey, account::Account};
 
 //     use super::*;
-//     use mollusk_svm::Mollusk;
-//     use pinocchio::{
-//         account_info::AccountInfo,
-//         pubkey::Pubkey,
-//         sysvars::rent::Rent
-//     };
-//     use std::collections::HashMap;
 
-//     fn test_program_entrypoint(
-//         _program_id: &Pubkey,
-//         accounts: &[AccountInfo],
-//         _instruction_data: &[u8],
-//     ) -> ProgramResult {
-//         create_token_account_cpi(
-//             &accounts[0], // token_account
-//             &accounts[1], // mint
-//             &accounts[2], // owner
-//             &accounts[3], // payer
-//             &accounts[4], // system_program
-//             &accounts[5], // token_program
-//             &accounts[6], // rent_sysvar
-//             b"test",      // seed_data
-//         )
-//     }
-
+//     const ID: Pubkey = pubkey!("FHUW81Au2k38MLkgsZ7af8FZDiDa1s8t2Hzn6bKstrpC");
+//     const USER: Pubkey = Pubkey::new_from_array([0x01; 32]);
 //     #[test]
-//     fn test_create_token_account_works() {
-//       let program_id = Pubkey::default();
+//     fn test_create_token_account_cpi() {
+//         //mollusk instance
+//         let mollusk = Mollusk::new(&ID, "../../target/deploy/pinocchio_spl_cpi");
 
-//       let mollusk = Mollusk::new(&program_id, test_program_entrypoint);
+//         //Pubkeys
+//         let token_account = Account::new(1 * 1_000_000_000, 0, &TOKEN_PROGRAM_ID.into());
+//         let mint =  Account::new(1 * 1_000_000_000, 0, &TOKEN_PROGRAM_ID.into());
+//         let owner =  Account::new(1 * 1_000_000_000, 0, &TOKEN_PROGRAM_ID.into());
+//         let payer =  Account::new(1 * 1_000_000_000, 0, &SYSTEM_PROGRAM_ID.into());
+//         let rent_sysvar = solana_program::sysvar::rent::id();
+
+//         //Build the accounts
+
+//         //Get the accounts meta
+
+//         //Data
+
+//         //Build IX
+
+//         //Get Tx Accounts
+
+//         //process and validate instruction
 //     }
 // }
