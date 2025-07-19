@@ -71,4 +71,18 @@ let ix = match token_type {
     )?,
 };
 
+let accounts = vec![
+    source.to_account_info(),
+    mint.to_account_info(),
+    destination.to_account_info(),
+    authority.to_account_info(),
+    token_program.to_account_info(),
+];
+
+// If using a PDA:
+let signer_seeds: &[&[u8]] = &[b"my_seed", &[bump]];
+
+// Or if not:
+let signer_seeds: &[&[u8]] = &[];
+
 invoke_signed(&ix, &accounts, signer_seeds)?;
