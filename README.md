@@ -43,14 +43,14 @@ pub enum TokenType {
 ```
 Then, when we want to send coins, we say:
 ```rust
-let program_id = match token_type {
+let token_program_id = match token_type {
     TokenType::Token => spl_token::id(),
     TokenType::Token2022 => spl_token_2022::id(),
 };
 
 let ix = match token_type {
     TokenType::Token => spl_token::instruction::transfer_checked(
-        &program_id,
+        &token_program_id,
         &source.key(),
         &mint.key(),
         &destination.key(),
@@ -60,7 +60,7 @@ let ix = match token_type {
         decimals,
     )?,
     TokenType::Token2022 => spl_token_2022::instruction::transfer_checked(
-        &program_id,
+        &token_program_id,
         &source.key(),
         &mint.key(),
         &destination.key(),
