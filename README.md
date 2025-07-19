@@ -1,35 +1,42 @@
-# 🛠️ Fixing Token2022 CPI Compatibility in Solana
+# 🛠️ Fix: Token2022 CPI Compatibility in Pinocchio
 
 ## 📌 Problem Statement
 
 The default instruction builders in the `spl-token` crate are **not compatible** with the `Token2022` program. These builders:
 
 - Assume the use of the legacy SPL Token program (`spl_token::id()`).
-- Hardcode instruction formats that don’t match the Token2022 layout.
-- Fail when used with `spl_token_2022::id()`, causing silent errors or CPI failures.
+- Hardcode instruction formats that are not accepted by Token2022.
+- Cause runtime failures or silent errors when used with `spl_token_2022::id()`.
 
-This makes it difficult to perform CPI (Cross-Program Invocation) with Token2022 in Anchor-based Solana programs.
+This makes it impossible to perform **Cross-Program Invocation (CPI)** with `Token2022` using the default APIs.
+
+🔗 **Related issue:** [anza-xyz/pinocchio#39](https://github.com/anza-xyz/pinocchio/issues/39)
 
 ---
 
 ## ✅ Solution
 
-This project resolves the issue by **manually building Token2022 instructions** instead of relying on the default SPL builders.
+This fix introduces **manual instruction construction** and **token program abstraction** to support Token2022 seamlessly.
 
-### Key Fixes
+### Key Improvements
 
-- ✳️ **Manual Instruction Construction**  
-  Used Token2022-specific instruction constructors such as:
-  - `initialize_mint2`: Initializes a Token2022-compatible mint with flexible authority setup.
-  - `initialize_account3`: Initializes a token account using the correct Token2022 layout.
-  - `transfer_checked`: Safely transfers tokens, including validation of decimals and authorities.
+- ✳️ **Manual Instruction Building**  
+  Directly constructs CPI-safe instructions like `initialize_mint2`, `initialize_account3`, and `transfer_checked` from the `spl-token-2022` crate.
 
-  These instructions are provided by the `spl-token-2022` crate and conform to Token2022's extended specification.
+- ✳️ **Dynamic Token Program Support**  
+  A `TokenType` enum abstracts over SPL Token and Token2022, allowing runtime selection of the correct instruction set.
 
-- ✳️ **Dynamic Token Program Selection**  
-  Introduced a `TokenType` enum:
-  ```rust
-  pub enum TokenType {
-      Token,
-      Token2022,
-  }
+- ✳️ **Controlled CPI Dispatching**  
+  All token instructions are invoked using `invoke_signed` for maximum control and signer support.
+
+---
+
+## 🔍 How It Works
+
+Each instruction is manually built based on the selected token program using a custom `TokenType` enum:
+
+```rust
+pub enum TokenType {
+    Token,
+    Token2022,
+}
