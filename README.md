@@ -1,42 +1,69 @@
-# 🛠️ Fix: Token2022 CPI Compatibility in Pinocchio
+# 🧸 Making Token Transfers Work with Token2022 in Solana
 
-## 📌 Problem Statement
+## 🐣 What’s the Problem?
 
-The default instruction builders in the `spl-token` crate are **not compatible** with the `Token2022` program. These builders:
+Imagine you have two toy machines:
 
-- Assume the use of the legacy SPL Token program (`spl_token::id()`).
-- Hardcode instruction formats that are not accepted by Token2022.
-- Cause runtime failures or silent errors when used with `spl_token_2022::id()`.
+- 🧸 **Old Token Machine**: This one is called `SPL Token`.
+- 🤖 **New Token Machine**: This one is called `Token2022`. It's newer, smarter, and has more buttons.
 
-This makes it impossible to perform **Cross-Program Invocation (CPI)** with `Token2022` using the default APIs.
+Now, you want to tell these machines to do things like:
 
-🔗 **Related issue:** [anza-xyz/pinocchio#39](https://github.com/anza-xyz/pinocchio/issues/39)
+- 🎁 "Make a new coin" (mint)
+- 📦 "Make a place to hold coins" (token account)
+- 💸 "Send coins to a friend" (transfer)
 
----
+But here’s the problem:
 
-## ✅ Solution
-
-This fix introduces **manual instruction construction** and **token program abstraction** to support Token2022 seamlessly.
-
-### Key Improvements
-
-- ✳️ **Manual Instruction Building**  
-  Directly constructs CPI-safe instructions like `initialize_mint2`, `initialize_account3`, and `transfer_checked` from the `spl-token-2022` crate.
-
-- ✳️ **Dynamic Token Program Support**  
-  A `TokenType` enum abstracts over SPL Token and Token2022, allowing runtime selection of the correct instruction set.
-
-- ✳️ **Controlled CPI Dispatching**  
-  All token instructions are invoked using `invoke_signed` for maximum control and signer support.
+> The talking instructions (`instruction builders`) you have only work with the old machine (SPL Token).  
+> When you try to use them with the new machine (Token2022), the new machine just stares at you… 😐  
+> It doesn’t understand the words. So nothing works.
 
 ---
 
-## 🔍 How It Works
+## 🧠 What’s the Fix?
 
-Each instruction is manually built based on the selected token program using a custom `TokenType` enum:
+We decided to speak the new machine’s language! Instead of using the old instructions, we:
+
+1. 📝 Wrote **custom instructions** that the new machine (Token2022) understands.
+2. 🎮 Used something called `invoke_signed`, which is like pressing the buttons ourselves.
+3. 🔄 Added a switch called `TokenType` so we can choose which machine to talk to (old or new).
+
+---
+
+## 🛠️ How It Works
+
+We made a new enum (a fancy word for a switch) called `TokenType`:
 
 ```rust
 pub enum TokenType {
-    Token,
-    Token2022,
+    Token,      // Use the old SPL Token machine
+    Token2022,  // Use the new Token2022 machine
 }
+
+Then, when we want to send coins, we say:
+
+let ix = match token_type {
+    TokenType::Token => spl_token::instruction::transfer_checked(
+        &token_program.key(),
+        &source.key(),
+        &mint.key(),
+        &destination.key(),
+        &authority.key(),
+        &[],
+        amount,
+        decimals,
+    )?,
+    TokenType::Token2022 => spl_token_2022::instruction::transfer_checked(
+        &token_program.key(),
+        &source.key(),
+        &mint.key(),
+        &destination.key(),
+        &authority.key(),
+        &[],
+        amount,
+        decimals,
+    )?,
+};
+
+invoke_signed(&ix, &accounts, signer_seeds)?;
