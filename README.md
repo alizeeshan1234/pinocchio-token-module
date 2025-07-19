@@ -40,8 +40,9 @@ pub enum TokenType {
     Token,      // Use the old SPL Token machine
     Token2022,  // Use the new Token2022 machine
 }
-
+```
 Then, when we want to send coins, we say:
+```rust
 
 let ix = match token_type {
     TokenType::Token => spl_token::instruction::transfer_checked(
